@@ -4,16 +4,18 @@ import java.io.IOException;
 
 import model.Dataset;
 import parserAndWriter.OutputWriter;
-import predictor.StupidPredictor;
+import persistence.PersistenceException;
+import predictor.GenreBasedPredictor;
+import predictor.GenreBasedPredictorv2;
 import tester.Tester;
 import util.PerformanceMeter;
 
 public class Main {
-	final String DATASET_FOLDER="dataset.test";
+	final String DATASET_FOLDER="dataset";
 	
 	
 	
-	public static void main(String[] args) throws IOException, ClassNotFoundException{
+	public static void main(String[] args) throws IOException, ClassNotFoundException, PersistenceException{
 		Main m=new Main();
 		PerformanceMeter pm=new PerformanceMeter();
 		pm.start();
@@ -22,13 +24,15 @@ public class Main {
 		System.out.println("Starting classification");
 		
 		OutputWriter outputWriter=new OutputWriter();
-		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1);
+		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1,100);
 		Dataset outputDataset=new Dataset(m.DATASET_FOLDER+"/output.dat");
 		
-		StupidPredictor stupidClassifier=new StupidPredictor();
-		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), outputDataset);
+//		StupidPredictor stupidClassifier=new StupidPredictor();
+//		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), outputDataset);
 //		GenreBasedPredictor gbp=new GenreBasedPredictor();
 //		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
+		GenreBasedPredictorv2 gbp=new GenreBasedPredictorv2();
+		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
 		
 		System.out.println("End classification");
 		pm.stop();

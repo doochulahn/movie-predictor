@@ -29,6 +29,34 @@ public class Genre {
 	public void setGenre(String genre) {
 		this.genre = genre;
 	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((genre == null) ? 0 : genre.hashCode());
+		result = prime * result + movieID;
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Genre other = (Genre) obj;
+		if (genre == null) {
+			if (other.genre != null)
+				return false;
+		} else if (!genre.equals(other.genre))
+			return false;
+		if (movieID != other.movieID)
+			return false;
+		return true;
+	}
 	
 	
 	
