@@ -6,7 +6,7 @@ import model.Dataset;
 import parserAndWriter.OutputWriter;
 import persistence.PersistenceException;
 import predictor.GenreBasedPredictor;
-import predictor.GenreBasedPredictorv2;
+import predictor.GenreDatabaseBasedPredictor;
 import tester.Tester;
 import util.PerformanceMeter;
 
@@ -24,14 +24,14 @@ public class Main {
 		System.out.println("Starting classification");
 		
 		OutputWriter outputWriter=new OutputWriter();
-		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1,100);
+		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1,50);
 		Dataset outputDataset=new Dataset(m.DATASET_FOLDER+"/output.dat");
 		
 //		StupidPredictor stupidClassifier=new StupidPredictor();
 //		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), outputDataset);
 //		GenreBasedPredictor gbp=new GenreBasedPredictor();
 //		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
-		GenreBasedPredictorv2 gbp=new GenreBasedPredictorv2();
+		GenreDatabaseBasedPredictor gbp=new GenreDatabaseBasedPredictor();
 		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
 		
 		System.out.println("End classification");

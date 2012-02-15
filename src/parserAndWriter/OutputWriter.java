@@ -10,13 +10,13 @@ import model.Prediction;
 
 public class OutputWriter {
 	
-	public void write(List<Prediction> prediction, Dataset outputDataset){
+	public void write(List<Prediction> predictions, Dataset outputDataset){
 		FileWriter fw;
 		try {
 			fw = new FileWriter(outputDataset.getFilename());
 			BufferedWriter bw=new BufferedWriter(fw);
 			bw.write("userID\tmovieID\trating"+"\n");
-			for (Prediction p: prediction){
+			for (Prediction p: predictions){
 				bw.write(p.toString()+"\n");
 			}
 			bw.close();

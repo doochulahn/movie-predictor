@@ -12,7 +12,12 @@ public class PersistenceFacade {
 		return dao.retrieveGenreVectorByMovieID(movieID);
 	}
 	
-	public List<Integer[]> getSimilarByGenreVectors(Integer[] vector) throws PersistenceException{
+	public List<Integer[]> getGenreBasedSimilarVectorsToTargetVector(Integer[] vector) throws PersistenceException{
+		GenreDao dao=new GenreDaoImpl();
+		return dao.retrieveSimilarVectors(vector);
+	}
+	
+	public List<Integer[]> getGenreBasedSimilarVectorsToTargetVectorByUserId(Integer[] vector) throws PersistenceException{
 		GenreDao dao=new GenreDaoImpl();
 		return dao.retrieveSimilarVectors(vector);
 	}
