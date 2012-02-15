@@ -6,8 +6,6 @@ import model.Dataset;
 import parserAndWriter.OutputWriter;
 import persistence.PersistenceException;
 import predictor.AdvancedGenreBasedPredictor;
-import predictor.GenreBasedPredictor;
-import predictor.GenreDatabaseBasedPredictor;
 import tester.Tester;
 import util.PerformanceMeter;
 
