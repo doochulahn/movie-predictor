@@ -12,7 +12,7 @@ import parserAndWriter.UserRatedMoviesParser;
 import persistence.PersistenceException;
 import persistence.PersistenceFacade;
 
-public class GenreBasedPredictorv2 implements Predictor{
+public class GenreDatabaseBasedPredictor implements Predictor{
 
 	/***
 	 * This method, for each target movie (about which make a prediction, and getted from input dataset), 
@@ -31,7 +31,7 @@ public class GenreBasedPredictorv2 implements Predictor{
 			int targetID=targetMovie.getMovieID();
 			int userID=targetMovie.getUserID();
 			Integer[] targetVector=pf.getGenreVectorByMovieID(targetID);
-			List<Integer[]> similarVectors=pf.getSimilarByGenreVectors(targetVector);
+			List<Integer[]> similarVectors=pf.getGenreBasedSimilarVectorsToTargetVector(targetVector);
 			HashMap<Integer, List<Integer[]>> rank2similarVectors=calculateRankOfSimilarVector(targetVector, similarVectors);
 			int max=Collections.max(rank2similarVectors.keySet());
 			List<Double> ratings=pf.getRatingsByGenreBasedVectors(rank2similarVectors.get(max));
@@ -44,8 +44,7 @@ public class GenreBasedPredictorv2 implements Predictor{
 			predictions.add(pred);
 			System.out.println("Aggiunta predizione: "+pred.toString());
 		}
-		
-		return null;
+		return predictions;
 		
 	}
 	
