@@ -2,6 +2,7 @@ package tester;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import model.Dataset;
 import parserAndWriter.PredictedRatingsParser;
@@ -25,12 +26,12 @@ public class Tester {
 	 * @return Return double, the Mean Average Error
 	 */
 	public double calculateMAE(){
-		HashMap<Integer, HashMap<Integer,Double>> userId2movieid2realPredictions=this.getRealPredictions();
-		HashMap<Integer, HashMap<Integer,Double>> userId2movieId2calculatedPredictions=this.getCalculatedPredictions();
+		Map<Integer, Map<Integer,Double>> userId2movieid2realPredictions=this.getRealPredictions();
+		Map<Integer, Map<Integer,Double>> userId2movieId2calculatedPredictions=this.getCalculatedPredictions();
 		ArrayList<Double> diffValues=new ArrayList<Double>();
 		for (int userID: userId2movieId2calculatedPredictions.keySet()){
-			HashMap<Integer,Double> movieID2ratingFromRealPrediction=userId2movieid2realPredictions.get(userID);
-			HashMap<Integer,Double> movieID2ratingFromCalculatePrediction=userId2movieId2calculatedPredictions.get(userID);
+			Map<Integer,Double> movieID2ratingFromRealPrediction=userId2movieid2realPredictions.get(userID);
+			Map<Integer,Double> movieID2ratingFromCalculatePrediction=userId2movieId2calculatedPredictions.get(userID);
 			for (int movieID: movieID2ratingFromCalculatePrediction.keySet()){
 				double calculatedPred=movieID2ratingFromCalculatePrediction.get(movieID);
 				if (movieID2ratingFromRealPrediction.containsKey(movieID)){
@@ -48,13 +49,13 @@ public class Tester {
 		return sum/diffValues.size();
 	}
 	
-	public HashMap<Integer, HashMap<Integer,Double>> getRealPredictions(){
+	public Map<Integer, Map<Integer,Double>> getRealPredictions(){
 		UserRatedMoviesParser p=new UserRatedMoviesParser();
 		Dataset.visit(this.testDataset, p);
 		return p.fromList2map();
 	}
 	
-	public HashMap<Integer, HashMap<Integer,Double>> getCalculatedPredictions(){
+	public Map<Integer, Map<Integer,Double>> getCalculatedPredictions(){
 		PredictedRatingsParser p=new PredictedRatingsParser();
 		Dataset.visit(this.predictedDataset, p);
 		return p.fromList2map();

@@ -5,6 +5,7 @@ import java.io.IOException;
 import model.Dataset;
 import parserAndWriter.OutputWriter;
 import persistence.PersistenceException;
+import predictor.AdvancedGenreBasedPredictor;
 import predictor.GenreBasedPredictor;
 import predictor.GenreDatabaseBasedPredictor;
 import tester.Tester;
@@ -24,15 +25,17 @@ public class Main {
 		System.out.println("Starting classification");
 		
 		OutputWriter outputWriter=new OutputWriter();
-		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1,50);
+		Dataset inputDataset=new Dataset(m.DATASET_FOLDER+"/user_ratedmovies.dat", 1,20000);
 		Dataset outputDataset=new Dataset(m.DATASET_FOLDER+"/output.dat");
 		
 //		StupidPredictor stupidClassifier=new StupidPredictor();
 //		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), outputDataset);
 //		GenreBasedPredictor gbp=new GenreBasedPredictor();
 //		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
-		GenreDatabaseBasedPredictor gbp=new GenreDatabaseBasedPredictor();
-		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
+//		GenreDatabaseBasedPredictor gbp=new GenreDatabaseBasedPredictor();
+//		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
+		AdvancedGenreBasedPredictor agbp=new AdvancedGenreBasedPredictor();
+		outputWriter.write(agbp.calculatePrediction(inputDataset), outputDataset);
 		
 		System.out.println("End classification");
 		pm.stop();

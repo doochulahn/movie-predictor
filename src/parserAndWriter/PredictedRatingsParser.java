@@ -3,6 +3,7 @@ package parserAndWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import model.Prediction;
 
@@ -13,11 +14,11 @@ public class PredictedRatingsParser implements Parser{
 		this.predictions=new ArrayList<Prediction>();
 	}
 	
-	public HashMap<Integer, HashMap<Integer,Double>> fromList2map(){
-		HashMap<Integer, HashMap<Integer,Double>> map=new HashMap<Integer, HashMap<Integer,Double>>();
+	public Map<Integer, Map<Integer,Double>> fromList2map(){
+		Map<Integer, Map<Integer,Double>> map=new HashMap<Integer, Map<Integer,Double>>();
 		for (Prediction p: this.predictions){
 			if (map.get(p.getUserId())!=null){
-				HashMap<Integer,Double> m1=map.get(p.getUserId());
+				Map<Integer,Double> m1=map.get(p.getUserId());
 				if (m1.get(p.getMovieId())!=null){
 					System.out.println("Problema");
 					//m1.put(Integer.parseInt(urm.getMovieID()), Double.parseDouble(urm.getRating()) );
