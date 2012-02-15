@@ -4,17 +4,25 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import model.Dataset;
-import model.Genre;
 import model.Prediction;
 import model.UserRatedMovie;
-import parserAndWriter.GenreParser;
 import parserAndWriter.UserRatedMoviesParser;
+import persistence.PersistenceException;
+import util.DataLoader;
 
 public class AdvancedGenreBasedPredictor implements Predictor{
-
+	private Map<Integer, Map<Integer,Double>> userId2MovieId2rating;
+	private Map<Integer,List<String>> movieID2genres;
+	private Map<Integer, Double> movieID2rtRating;
+	
+	public AdvancedGenreBasedPredictor() throws PersistenceException{
+		loadDataStructuresInMemory();
+	}
+	
 	/***
 	 * This method, for each target movie (about which make a prediction, and getted from input dataset), 
 	 * return the prediction calculated by mean average of ratings of same user about similar movies.
@@ -24,54 +32,104 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	@Override
 	public List<Prediction> calculatePrediction(Dataset inputSet) {
 		List<Prediction> predictions=new ArrayList<Prediction>();
+		
 		UserRatedMoviesParser p=new UserRatedMoviesParser();
-		Dataset.visit(inputSet, p);// ancihè andare nel dataset posso prende da db
-		HashMap<Integer,List<String>> movieID2genres=this.getMovieID2genres();
-		HashMap<Integer, HashMap<Integer,Double>> userId2MovieId2rating=p.fromList2map();
-		for (UserRatedMovie targetMovie: p.getResults()){
-			int targetID=targetMovie.getMovieID();
-			HashMap<Integer, List<Integer>> ranking2similarMovieIDs=this.getRankedSimilarMoviesByGenre(targetID, movieID2genres);
+		Dataset.visit(inputSet,p);
+		List<UserRatedMovie> inputList=p.getResults();
+		for (int i=0; i<inputList.size();i++){
+			UserRatedMovie targetMovie=inputList.get(i);
+			int targetMovieID=targetMovie.getMovieID();
+			Map<Integer, List<Integer>> ranking2similarMovieIDs=getRankedSimilarMoviesByGenre(targetMovieID, movieID2genres);
 			
 			int max=Collections.max(ranking2similarMovieIDs.keySet());
-			
 			List<Integer> similarMovieIDs=ranking2similarMovieIDs.get(max);
-			
 			List<Double> ratings=this.getRatingsOfUser(userId2MovieId2rating, similarMovieIDs, targetMovie.getUserID());
 			Prediction pred;
 			if (ratings.size()==0){
 				// e qui c'è un caso che dovrebbe essere analizzato più approfonditamente
-				pred=new Prediction(targetMovie.getUserID(), targetID, 2.5);// qui potrei restituirgli il voto reale di rt
+//				pred=new Prediction(targetMovie.getUserID(), targetMovieID, 2.5);// qui potrei restituirgli il voto reale di rt
+				pred=new Prediction(targetMovie.getUserID(), targetMovieID, this.movieID2rtRating.get(targetMovieID));
 			}else{
 				double meanAverage=calculateMeanAverage(ratings);
+				double rtRating=this.movieID2rtRating.get(targetMovieID)/2.;
 				if (meanAverage>=2.5){
 					if (haveSeenGoodMovies(similarMovieIDs)){
 						//restituisco il voto reale, perchè non stravede per il genere e quindi potrebbe non piacergli, diamogli i voti che 
 						// gli hanno dato gli altri (rt)
 						// non siamo sicuri che stravede per il genere, e quindi meglio andare cauti, e dargli il voto che spetta al film
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
+					}else if (haveSeenBadMovies(similarMovieIDs)){
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, 5);
 					}else{
 						// stravede per il genere (quindi voto alto più una parte derivante dalla qualità del film)
 //						restituisco la media tra il rating dato dagli altri utenti e la media che lui da al genere
+						double rat=rtRating+meanAverage/2;
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rat);
 					}
-				} else{
+				} else{// anzichè haveSeendGoodMovie meglio haveSeendBadMovies (con i 3/4 di film brutti)
 					if (haveSeenGoodMovies(similarMovieIDs)){// ha dato un voto basso ma i film sono tutti belli
 						//gli fa proprio schifo il genere, e quindi meglio fare una media tra il voto che lui da al genere e il voto reale del film (metti che è un filmone, potrebbe piacergli)
 						// in modo che se il valore reale è alto, allora è un buon film che potrebbe cmq piacergli
-					}else{
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, meanAverage);
+					}else if (haveSeenBadMovies(similarMovieIDs)){
 						// non gli piace il genere, meglio restituire o il voto che da al genere, oppure una media tra il suo voto e
 						// quello che altri utenti danno al genere
+						// non gli piace ma perchè si è visto
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
+					}else{
+						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
 					}
 				}
-//				pred=new Prediction(targetMovie.getUserID(), targetID, );
 			}
-//			predictions.add(pred);
-//			System.out.println("Aggiunta predizione: "+pred.toString());
+			predictions.add(pred);
+			System.out.println("Aggiunta predizione "+i+": "+pred.toString());
 		}
 		return predictions;
 		
 	}
 	
-	public static boolean haveSeenGoodMovies(List<Integer> similarMovieIDs){
-		return true;
+	/**
+	 * Calcola se il film sono di buona qualità o meno
+	 * @param similarMovieIDs - i film da valutare
+	 * @return
+	 */
+	public boolean haveSeenGoodMovies(List<Integer> similarMovieIDs){
+		Double[] ratings=new Double[similarMovieIDs.size()];
+		int goodMoviesNum=0;
+		for (int i=0;i<ratings.length;i++){
+			if (similarMovieIDs.get(i)>5){
+				goodMoviesNum++;
+			}
+		}
+		if (goodMoviesNum> 3.*similarMovieIDs.size()/4. ){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	public boolean haveSeenBadMovies(List<Integer> similarMovieIDs){
+		Double[] ratings=new Double[similarMovieIDs.size()];
+		int badMoviesNum=0;
+		for (int i=0;i<ratings.length;i++){
+			if (similarMovieIDs.get(i)<5){
+				badMoviesNum++;
+			}
+		}
+		if (badMoviesNum> 3.*similarMovieIDs.size()/4. ){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public void loadDataStructuresInMemory() throws PersistenceException{
+		System.out.println("Loading predictor...");
+		DataLoader dl=new DataLoader();
+		this.userId2MovieId2rating=dl.loadSeenMoviesByUser();
+		this.movieID2genres=dl.loadMovieID2genres();
+		this.movieID2rtRating=dl.loadMovieID2rtRating();
+//		quali strutture dati mi servono?
+		System.out.println("Predictor is ready!");
 	}
 	
 	/***
@@ -81,7 +139,7 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	 * @param targetUserID - the user whole knowing rating
 	 * @return
 	 */
-	private List<Double> getRatingsOfUser(HashMap<Integer,HashMap<Integer, Double>> userId2MovieId2rating, List<Integer> movieIDs, int targetUserID){
+	private List<Double> getRatingsOfUser(Map<Integer,Map<Integer, Double>> userId2MovieId2rating, List<Integer> movieIDs, int targetUserID){
 		List<Double> ratings=new ArrayList<Double>();
 		for (int movieId: movieIDs){
 			if (userId2MovieId2rating.containsKey(targetUserID) && userId2MovieId2rating.get(targetUserID).containsKey(movieId)){
@@ -95,9 +153,9 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	 * @param targetID
 	 * @param movieID2genres
 	 */
-	private HashMap<Integer, List<Integer>> getRankedSimilarMoviesByGenre(int targetID, HashMap<Integer,List<String>> movieID2genres){
+	private Map<Integer, List<Integer>> getRankedSimilarMoviesByGenre(int targetID, Map<Integer,List<String>> movieID2genres){
 		List<String> genresOfTargetMovie=movieID2genres.get(targetID);
-		HashMap<Integer, List<Integer>> ranking2similarMovieIDs=new HashMap<Integer, List<Integer>>();
+		Map<Integer, List<Integer>> ranking2similarMovieIDs=new HashMap<Integer, List<Integer>>();
 		Set<Integer> genericMovieID=movieID2genres.keySet();
 		for (int i: genericMovieID){
 			if (i!=targetID){
@@ -114,21 +172,7 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 		}
 		return ranking2similarMovieIDs;
 	}
-	private HashMap<Integer, List<String>> getMovieID2genres(){
-		HashMap<Integer, List<String>> movieID2genres=new HashMap<Integer, List<String>>();
-		GenreParser p=new GenreParser();
-		Dataset.visit(new Dataset("dataset/movie_genres.dat",1),p);
-		for (Genre g: p.getResults()){
-			if (movieID2genres.containsKey(g.getMovieID())){
-				movieID2genres.get(g.getMovieID()).add(g.getGenre());
-			}else{
-				List<String> l=new ArrayList<String>();
-				l.add(g.getGenre());
-				movieID2genres.put(g.getMovieID(), l);
-			}
-		}
-		return movieID2genres;
-	}
+	
 	
 	private static double calculateMeanAverage(List<Double> l){
 		double sum=0;

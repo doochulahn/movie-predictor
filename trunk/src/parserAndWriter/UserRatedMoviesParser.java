@@ -3,6 +3,7 @@ package parserAndWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import model.UserRatedMovie;
 
@@ -26,11 +27,11 @@ public class UserRatedMoviesParser implements Parser{
 		return this.userRatedMovies;
 	}
 	
-	public HashMap<Integer, HashMap<Integer,Double>> fromList2map(){
-		HashMap<Integer, HashMap<Integer,Double>> map=new HashMap<Integer, HashMap<Integer,Double>>();
+	public Map<Integer, Map<Integer,Double>> fromList2map(){
+		Map<Integer, Map<Integer,Double>> map=new HashMap<Integer, Map<Integer,Double>>();
 		for (UserRatedMovie urm: this.userRatedMovies){
 			if (map.get(urm.getUserID())!=null){
-				HashMap<Integer,Double> m1=map.get(urm.getUserID());
+				Map<Integer,Double> m1=map.get(urm.getUserID());
 				if (m1.get(urm.getMovieID())!=null){
 					System.out.println("Problema");
 					//m1.put(Integer.parseInt(urm.getMovieID()), Double.parseDouble(urm.getRating()) );
