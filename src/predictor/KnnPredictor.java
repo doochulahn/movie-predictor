@@ -1,5 +1,6 @@
 package predictor;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -18,7 +19,7 @@ import util.PerformanceMeter;
 
 public class KnnPredictor implements Predictor{
 	private Map<Integer,Instance> id2instance;
-	private final static int K=40;
+	private final static int K=50;
 	
 	public KnnPredictor() throws PersistenceException{
 		this.loadDataStructuresInMemory();
@@ -30,12 +31,14 @@ public class KnnPredictor implements Predictor{
 		InputFileParser p=new InputFileParser();
 		Dataset.visit(inputSet,p);
 		List<InputFileRow> inputList=p.getResults();
+		
 		for (int i=0; i<inputList.size();i++){
 			InputFileRow row=inputList.get(i);
 			int targetMovieID=row.getMovieID();
 			Instance targetInstance=this.id2instance.get(targetMovieID);
 			Neighbors neighbors=calculateNeighbour(targetInstance);
 			double predictedRating=calculateAverageRating(neighbors.getFirstKneighbors(K));
+			predictedRating=roundToFirstPlaceAfterComma(predictedRating);
 			Prediction pred=new Prediction(row.getUserID(), targetMovieID, predictedRating/2);
 			predictions.add(pred);
 			System.out.println("Aggiunta predizione "+i+": "+pred.toString());
@@ -69,6 +72,16 @@ public class KnnPredictor implements Predictor{
 		distance+=Math.pow(tmp1, 2);
 		tmp1=(Integer) targetInstance.get(FeaturePosition.TOP250MOVIE).getDistanceThan( i.get(FeaturePosition.TOP250MOVIE) );
 		distance+=Math.pow(tmp1, 2);
+		tmp1=(Integer) targetInstance.get(FeaturePosition.TOP_ACTORS_COUNT).getDistanceThan( i.get(FeaturePosition.TOP_ACTORS_COUNT) );
+		distance+=Math.pow(tmp1, 2);
+		tmp1=(Integer) targetInstance.get(FeaturePosition.MEDIAN_ACTORS_COUNT).getDistanceThan( i.get(FeaturePosition.MEDIAN_ACTORS_COUNT) );
+		distance+=Math.pow(tmp1, 2);
+		tmp1=(Integer) targetInstance.get(FeaturePosition.BOTTOM_ACTORS_COUNT).getDistanceThan( i.get(FeaturePosition.BOTTOM_ACTORS_COUNT) );
+		distance+=Math.pow(tmp1, 2);
+		tmp1=(Integer) targetInstance.get(FeaturePosition.IS_DIRECTOR_IN_TOP100_IMDB_DIRECTORS).getDistanceThan( i.get(FeaturePosition.IS_DIRECTOR_IN_TOP100_IMDB_DIRECTORS) );
+		distance+=Math.pow(tmp1, 2);
+		tmp1=(Integer) targetInstance.get(FeaturePosition.DIRECTOR_POSITION_IN_TOP100).getDistanceThan( i.get(FeaturePosition.DIRECTOR_POSITION_IN_TOP100) );
+		distance+=Math.pow(tmp1, 2);
 		return Math.sqrt(distance);	
 	}
 
@@ -81,6 +94,13 @@ public class KnnPredictor implements Predictor{
 		this.id2instance=dl.loadAllInstances();
 		System.out.println("Predictor is ready!");
 		pm.stop();
+	}
+	
+	public static double roundToFirstPlaceAfterComma(double predictedRating){
+		int decimalPlace=1;
+		BigDecimal bd=new BigDecimal(predictedRating);
+		bd.setScale(decimalPlace, BigDecimal.ROUND_UP);
+		return bd.doubleValue();
 	}
 
 }

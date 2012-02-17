@@ -286,7 +286,12 @@ public class DataLoaderHelper {
 		Map<Integer,Instance> id2instance=new HashMap<Integer,Instance>();
 		Connection connection=this.dataSource.getConnection();
 		PreparedStatement statement=null;
-		String query="select id, idrtAllCriticsRating,numberOfTop100Actors,isTop250movie from movies";
+		String query="SELECT  m.id, m.idrtAllCriticsRating,m.numberOfTop100Actors,m.isTop250movie, " +
+							"b.count, t.count, m2.count," +
+							"m.isDirectorInTop100ImdbDirectors, m.directorPositionInTop100 " +
+					"FROM (((movies m LEFT JOIN bottomActorCounting b ON m.id=b.id)" +
+						" LEFT JOIN topActorCounting t ON m.id=t.id)" +
+						" LEFT JOIN medianActorCounting m2 ON m.id=m2.id)";
 		try{
 			statement=connection.prepareStatement(query);
 			ResultSet res=statement.executeQuery();
@@ -296,6 +301,11 @@ public class DataLoaderHelper {
 				instance.addFeature(FeaturePosition.RTID, new DoubleFeature(res.getDouble("idrtAllCriticsRating")));
 				instance.addFeature(FeaturePosition.TOP100ACTORSNUMBER, new IntFeature(res.getInt("numberOfTop100Actors")));
 				instance.addFeature(FeaturePosition.TOP250MOVIE, new IntFeature(res.getInt("isTop250movie")));
+				instance.addFeature(FeaturePosition.BOTTOM_ACTORS_COUNT, new IntFeature(res.getInt("b.count")));
+				instance.addFeature(FeaturePosition.TOP_ACTORS_COUNT, new IntFeature(res.getInt("t.count")));
+				instance.addFeature(FeaturePosition.MEDIAN_ACTORS_COUNT, new IntFeature(res.getInt("m2.count")));
+				instance.addFeature(FeaturePosition.IS_DIRECTOR_IN_TOP100_IMDB_DIRECTORS, new IntFeature(res.getInt("m.isDirectorInTop100ImdbDirectors")));
+				instance.addFeature(FeaturePosition.DIRECTOR_POSITION_IN_TOP100, new IntFeature(res.getInt("m.directorPositionInTop100")));
 				id2instance.put((Integer) instance.get(FeaturePosition.ID).getValue(),instance);
 			}
 		}
