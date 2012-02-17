@@ -13,9 +13,15 @@ public class UserRatedMovie {
 		this.userID=Integer.parseInt(attributes[0]);
 		this.movieID=Integer.parseInt(attributes[1]);
 		this.rating=Double.parseDouble(attributes[2]);
-		this.timestamp=attributes[3];
+//		this.timestamp=attributes[3];
 	}
 	
+
+	public UserRatedMovie() {
+		this.userID=0;
+		this.movieID=0;
+	}
+
 
 	public int getUserID() {
 		return userID;
