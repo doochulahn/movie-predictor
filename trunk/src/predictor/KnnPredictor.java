@@ -1,6 +1,5 @@
 package predictor;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -9,6 +8,7 @@ import java.util.Map;
 import model.Dataset;
 import model.InputFileRow;
 import model.Prediction;
+import model.UserRatedMovie;
 import model.knn.FeaturePosition;
 import model.knn.Instance;
 import model.knn.Neighbors;
@@ -19,8 +19,8 @@ import util.PerformanceMeter;
 
 public class KnnPredictor implements Predictor{
 	private Map<Integer,Instance> id2instance;
-	private final static int K=50;
-	
+	private final static int K=100;
+
 	public KnnPredictor() throws PersistenceException{
 		this.loadDataStructuresInMemory();
 	}
@@ -31,7 +31,11 @@ public class KnnPredictor implements Predictor{
 		InputFileParser p=new InputFileParser();
 		Dataset.visit(inputSet,p);
 		List<InputFileRow> inputList=p.getResults();
+
 		
+		//
+		AdvancedGenreBasedPredictor bgp=new AdvancedGenreBasedPredictor();
+		//
 		for (int i=0; i<inputList.size();i++){
 			InputFileRow row=inputList.get(i);
 			int targetMovieID=row.getMovieID();
@@ -39,13 +43,25 @@ public class KnnPredictor implements Predictor{
 			Neighbors neighbors=calculateNeighbour(targetInstance);
 			double predictedRating=calculateAverageRating(neighbors.getFirstKneighbors(K));
 			predictedRating=roundToFirstPlaceAfterComma(predictedRating);
+			
+			//qui inseriamo il genrebased e poi facciamo la media...ma come farla se...ci da la lista e non una singola predizione?
+			
+			UserRatedMovie u=new UserRatedMovie();
+			u.setMovieID(targetMovieID);
+			u.setUserID(row.getUserID());
+			Prediction p1=bgp.makeSinglePrediction(u);
+			//
 			Prediction pred=new Prediction(row.getUserID(), targetMovieID, predictedRating/2);
-			predictions.add(pred);
+			
+			//
+			Prediction finalPred=new Prediction(row.getUserID(), targetMovieID, pred.getRating()+p1.getRating()/2.);
+			//
+			predictions.add(finalPred);
 			System.out.println("Aggiunta predizione "+i+": "+pred.toString());
 		}
 		return predictions;
 	}
-	
+
 	private double calculateAverageRating(List<Instance> firstKneighbors) {
 		double tmpAverage=0.;
 		for (Instance i: firstKneighbors){
@@ -95,12 +111,16 @@ public class KnnPredictor implements Predictor{
 		System.out.println("Predictor is ready!");
 		pm.stop();
 	}
-	
+
 	public static double roundToFirstPlaceAfterComma(double predictedRating){
-		int decimalPlace=1;
-		BigDecimal bd=new BigDecimal(predictedRating);
-		bd.setScale(decimalPlace, BigDecimal.ROUND_UP);
-		return bd.doubleValue();
+		int decimalPlace=0;
+		double power_of_ten = 1;
+		double fudge_factor = 0.05;
+		while (decimalPlace-- > 0) {
+			power_of_ten *= 10.0d;
+			fudge_factor /= 10.0d;
+		}
+		return Math.round((predictedRating + fudge_factor)* power_of_ten)  / power_of_ten;
 	}
 
 }
