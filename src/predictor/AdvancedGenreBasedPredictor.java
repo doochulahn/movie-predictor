@@ -5,19 +5,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import model.Dataset;
+import model.InputFileRow;
 import model.Prediction;
-import model.UserRatedMovie;
-import parserAndWriter.UserRatedMoviesParser;
+import parserAndWriter.InputFileParser;
 import persistence.PersistenceException;
 import util.DataLoader;
+import util.PerformanceMeter;
 
 public class AdvancedGenreBasedPredictor implements Predictor{
 	private Map<Integer, Map<Integer,Double>> userId2MovieId2rating;
-	private Map<Integer,List<String>> movieID2genres;
 	private Map<Integer, Double> movieID2rtRating;
+	private Map<Integer,Integer[]> moviedId2genreVector;
+	private Map<Integer,List<Integer[]>> movieID2genreBasedSimilarVector;
 	
 	public AdvancedGenreBasedPredictor() throws PersistenceException{
 		loadDataStructuresInMemory();
@@ -33,51 +34,53 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	public List<Prediction> calculatePrediction(Dataset inputSet) {
 		List<Prediction> predictions=new ArrayList<Prediction>();
 		
-		UserRatedMoviesParser p=new UserRatedMoviesParser();
+		InputFileParser p=new InputFileParser();
 		Dataset.visit(inputSet,p);
-		List<UserRatedMovie> inputList=p.getResults();
+		List<InputFileRow> inputList=p.getResults();
 		for (int i=0; i<inputList.size();i++){
-			UserRatedMovie targetMovie=inputList.get(i);
-			int targetMovieID=targetMovie.getMovieID();
-			Map<Integer, List<Integer>> ranking2similarMovieIDs=getRankedSimilarMoviesByGenre(targetMovieID, movieID2genres);
+			InputFileRow inputFileRow=inputList.get(i);
+			int targetMovieID=inputFileRow.getMovieID();
+			Integer[] targetVector=this.moviedId2genreVector.get(targetMovieID);
+			List<Integer[]> similarVectors=this.movieID2genreBasedSimilarVector.get(targetMovieID);
+			Map<Integer, List<Integer[]>> ranking2similarVectors=calculateRank2SimilarVector(targetVector, similarVectors);
 			
-			int max=Collections.max(ranking2similarMovieIDs.keySet());
-			List<Integer> similarMovieIDs=ranking2similarMovieIDs.get(max);
-			List<Double> ratings=this.getRatingsOfUser(userId2MovieId2rating, similarMovieIDs, targetMovie.getUserID());
+			int max=Collections.max(ranking2similarVectors.keySet());
+			List<Integer[]> similarMoviesVectors=ranking2similarVectors.get(max);
+			List<Double> ratings=getRatingsOfUserForGenreBasedSimilarMovies(similarMoviesVectors, inputFileRow.getUserID());
 			Prediction pred;
 			if (ratings.size()==0){
 				// e qui c'è un caso che dovrebbe essere analizzato più approfonditamente
 //				pred=new Prediction(targetMovie.getUserID(), targetMovieID, 2.5);// qui potrei restituirgli il voto reale di rt
-				pred=new Prediction(targetMovie.getUserID(), targetMovieID, this.movieID2rtRating.get(targetMovieID));
+				pred=new Prediction(inputFileRow.getUserID(), targetMovieID, this.movieID2rtRating.get(targetMovieID));
 			}else{
 				double meanAverage=calculateMeanAverage(ratings);
 				double rtRating=this.movieID2rtRating.get(targetMovieID)/2.;
 				if (meanAverage>=2.5){
-					if (haveSeenGoodMovies(similarMovieIDs)){
+					if (haveSeenGoodMovies(similarMoviesVectors)){
 						//restituisco il voto reale, perchè non stravede per il genere e quindi potrebbe non piacergli, diamogli i voti che 
 						// gli hanno dato gli altri (rt)
 						// non siamo sicuri che stravede per il genere, e quindi meglio andare cauti, e dargli il voto che spetta al film
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
-					}else if (haveSeenBadMovies(similarMovieIDs)){
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, 5);
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, rtRating);
+					}else if (haveSeenBadMovies(similarMoviesVectors)){
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, 5);
 					}else{
 						// stravede per il genere (quindi voto alto più una parte derivante dalla qualità del film)
 //						restituisco la media tra il rating dato dagli altri utenti e la media che lui da al genere
 						double rat=rtRating+meanAverage/2;
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rat);
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, rat);
 					}
 				} else{// anzichè haveSeendGoodMovie meglio haveSeendBadMovies (con i 3/4 di film brutti)
-					if (haveSeenGoodMovies(similarMovieIDs)){// ha dato un voto basso ma i film sono tutti belli
+					if (haveSeenGoodMovies(similarMoviesVectors)){// ha dato un voto basso ma i film sono tutti belli
 						//gli fa proprio schifo il genere, e quindi meglio fare una media tra il voto che lui da al genere e il voto reale del film (metti che è un filmone, potrebbe piacergli)
 						// in modo che se il valore reale è alto, allora è un buon film che potrebbe cmq piacergli
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, meanAverage);
-					}else if (haveSeenBadMovies(similarMovieIDs)){
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, meanAverage);
+					}else if (haveSeenBadMovies(similarMoviesVectors)){
 						// non gli piace il genere, meglio restituire o il voto che da al genere, oppure una media tra il suo voto e
 						// quello che altri utenti danno al genere
 						// non gli piace ma perchè si è visto
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, rtRating);
 					}else{
-						pred=new Prediction(targetMovie.getUserID(), targetMovieID, rtRating);
+						pred=new Prediction(inputFileRow.getUserID(), targetMovieID, rtRating);
 					}
 				}
 			}
@@ -90,32 +93,32 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	
 	/**
 	 * Calcola se il film sono di buona qualità o meno
-	 * @param similarMovieIDs - i film da valutare
+	 * @param similarMovieVectors - i film da valutare
 	 * @return
 	 */
-	public boolean haveSeenGoodMovies(List<Integer> similarMovieIDs){
-		Double[] ratings=new Double[similarMovieIDs.size()];
+	public boolean haveSeenGoodMovies(List<Integer[]> similarMovieVectors){
+		Double[] ratings=new Double[similarMovieVectors.size()];
 		int goodMoviesNum=0;
 		for (int i=0;i<ratings.length;i++){
-			if (similarMovieIDs.get(i)>5){
+			if (this.movieID2rtRating.get( similarMovieVectors.get(i)[0] )>5){
 				goodMoviesNum++;
 			}
 		}
-		if (goodMoviesNum> 3.*similarMovieIDs.size()/4. ){
+		if (goodMoviesNum> 3.*similarMovieVectors.size()/4. ){
 			return true;
 		}else{
 			return false;
 		}
 	}
-	public boolean haveSeenBadMovies(List<Integer> similarMovieIDs){
-		Double[] ratings=new Double[similarMovieIDs.size()];
+	public boolean haveSeenBadMovies(List<Integer[]> similarMovieVectors){
+		Double[] ratings=new Double[similarMovieVectors.size()];
 		int badMoviesNum=0;
 		for (int i=0;i<ratings.length;i++){
-			if (similarMovieIDs.get(i)<5){
+			if (this.movieID2rtRating.get( similarMovieVectors.get(i)[0] ) <5){
 				badMoviesNum++;
 			}
 		}
-		if (badMoviesNum> 3.*similarMovieIDs.size()/4. ){
+		if (badMoviesNum> 3.*similarMovieVectors.size()/4. ){
 			return true;
 		}else{
 			return false;
@@ -123,13 +126,16 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	}
 	
 	public void loadDataStructuresInMemory() throws PersistenceException{
+		PerformanceMeter pm=new PerformanceMeter();
+		pm.start();
 		System.out.println("Loading predictor...");
 		DataLoader dl=new DataLoader();
-		this.userId2MovieId2rating=dl.loadSeenMoviesByUser();
-		this.movieID2genres=dl.loadMovieID2genres();
+		this.userId2MovieId2rating=dl.loadSeenAndRatedMoviesByUser();
+		this.movieID2genreBasedSimilarVector=dl.loadMovieID2genreBasedSimilarVector();
 		this.movieID2rtRating=dl.loadMovieID2rtRating();
-//		quali strutture dati mi servono?
+//		this.moviedId2genreVector=dl.loadMovieID2genresVector();
 		System.out.println("Predictor is ready!");
+		pm.stop();
 	}
 	
 	/***
@@ -139,38 +145,32 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 	 * @param targetUserID - the user whole knowing rating
 	 * @return
 	 */
-	private List<Double> getRatingsOfUser(Map<Integer,Map<Integer, Double>> userId2MovieId2rating, List<Integer> movieIDs, int targetUserID){
+	private List<Double> getRatingsOfUserForGenreBasedSimilarMovies(List<Integer[]> similarMoviesVectors, int targetUserID){
 		List<Double> ratings=new ArrayList<Double>();
-		for (int movieId: movieIDs){
-			if (userId2MovieId2rating.containsKey(targetUserID) && userId2MovieId2rating.get(targetUserID).containsKey(movieId)){
-				ratings.add(userId2MovieId2rating.get(targetUserID).get(movieId));
-			}
+		for (Integer[] v: similarMoviesVectors){
+			ratings.add( this.userId2MovieId2rating.get(targetUserID).get(v[0]) );
 		}
 		return ratings;
 	}
-	/**
-	 * This method calculate similar movies to target movie
-	 * @param targetID
-	 * @param movieID2genres
-	 */
-	private Map<Integer, List<Integer>> getRankedSimilarMoviesByGenre(int targetID, Map<Integer,List<String>> movieID2genres){
-		List<String> genresOfTargetMovie=movieID2genres.get(targetID);
-		Map<Integer, List<Integer>> ranking2similarMovieIDs=new HashMap<Integer, List<Integer>>();
-		Set<Integer> genericMovieID=movieID2genres.keySet();
-		for (int i: genericMovieID){
-			if (i!=targetID){
-				int ranking=countMatchingStrings(genresOfTargetMovie, movieID2genres.get(i));
-				// qui dovrei fare un controllo nel caso in cui il ranking sia zero, se lo fosse è inutile che lo aggiungo alla mappa
-				if (ranking2similarMovieIDs.containsKey(ranking)){
-					ranking2similarMovieIDs.get(ranking).add(i);
-				}else{
-					List<Integer> l=new ArrayList<Integer>();
-					l.add(i);
-					ranking2similarMovieIDs.put(ranking, l);
+
+	private static HashMap<Integer, List<Integer[]>> calculateRank2SimilarVector(Integer[] targetVector, List<Integer[]> similarVectors){
+		HashMap<Integer, List<Integer[]>> rank2similarMovieVectors=new HashMap<Integer, List<Integer[]>>();
+		for (Integer[] similarVector: similarVectors){
+			int rank=0;
+			for (int i=0; i<targetVector.length;i++){
+				if (targetVector[i]==1 && similarVector[i]==1){
+					rank++;
 				}
 			}
+			if (rank2similarMovieVectors.containsKey(rank)){
+				rank2similarMovieVectors.get(rank).add(similarVector);
+			}else{
+				List<Integer[]> l=new ArrayList<Integer[]>();
+				l.add(similarVector);
+				rank2similarMovieVectors.put(rank, l);
+			}
 		}
-		return ranking2similarMovieIDs;
+		return rank2similarMovieVectors;
 	}
 	
 	
@@ -182,15 +182,7 @@ public class AdvancedGenreBasedPredictor implements Predictor{
 		return sum/l.size();
 	}
 	
-	private static int countMatchingStrings(List<String> gs1, List<String> gs2){
-		int i=0;
-		for (String g1: gs1){
-			if (gs2.contains(g1)){
-				i++;
-			}
-		}
-		return i;
-	}
+	
 	
 
 }
