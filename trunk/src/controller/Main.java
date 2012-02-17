@@ -24,7 +24,7 @@ public class Main {
 		Dataset inputDataset=new Dataset(fileInputName, 1,20000);
 		
 //		StupidPredictor stupidClassifier=new StupidPredictor();
-//		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), outputDataset);
+//		outputWriter.write(stupidClassifier.calculatePrediction(inputDataset), fileOutputName);
 //		GenreBasedPredictor gbp=new GenreBasedPredictor();
 //		outputWriter.write(gbp.calculatePrediction(inputDataset), outputDataset);
 //		GenreDatabaseBasedPredictor gbp=new GenreDatabaseBasedPredictor();
