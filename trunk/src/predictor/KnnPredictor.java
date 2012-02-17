@@ -8,7 +8,6 @@ import java.util.Map;
 import model.Dataset;
 import model.InputFileRow;
 import model.Prediction;
-import model.UserRatedMovie;
 import model.knn.FeaturePosition;
 import model.knn.Instance;
 import model.knn.Neighbors;
@@ -17,14 +16,27 @@ import persistence.PersistenceException;
 import util.DataLoader;
 import util.PerformanceMeter;
 
+
+/***
+ * This class implements the k-nn algorithm. 
+ * It has method to get all instance in memory, get the neighbors of each instance.
+ * The distance of each movie is calculated with Euclidian distance.
+ * @author bitliner
+ *
+ */
 public class KnnPredictor implements Predictor{
 	private Map<Integer,Instance> id2instance;
-	private final static int K=100;
+	private final static int K=1000;
 
 	public KnnPredictor() throws PersistenceException{
 		this.loadDataStructuresInMemory();
 	}
 
+	
+	/****
+	 * This method has as input a dataset, that contains the data of movies of which making preictions,
+	 * and returns a list of predictions.
+	 */
 	@Override
 	public List<Prediction> calculatePrediction(Dataset inputSet)throws PersistenceException {
 		List<Prediction> predictions=new ArrayList<Prediction>();
@@ -32,36 +44,27 @@ public class KnnPredictor implements Predictor{
 		Dataset.visit(inputSet,p);
 		List<InputFileRow> inputList=p.getResults();
 
-		
-		//
-		AdvancedGenreBasedPredictor bgp=new AdvancedGenreBasedPredictor();
-		//
 		for (int i=0; i<inputList.size();i++){
 			InputFileRow row=inputList.get(i);
 			int targetMovieID=row.getMovieID();
 			Instance targetInstance=this.id2instance.get(targetMovieID);
-			Neighbors neighbors=calculateNeighbour(targetInstance);
+			Neighbors neighbors=calculateNeighbors(targetInstance);
 			double predictedRating=calculateAverageRating(neighbors.getFirstKneighbors(K));
 			predictedRating=roundToFirstPlaceAfterComma(predictedRating);
 			
-			//qui inseriamo il genrebased e poi facciamo la media...ma come farla se...ci da la lista e non una singola predizione?
+			Prediction pred=new Prediction(row.getUserID(), targetMovieID, predictedRating/2.);
 			
-			UserRatedMovie u=new UserRatedMovie();
-			u.setMovieID(targetMovieID);
-			u.setUserID(row.getUserID());
-			Prediction p1=bgp.makeSinglePrediction(u);
-			//
-			Prediction pred=new Prediction(row.getUserID(), targetMovieID, predictedRating/2);
-			
-			//
-			Prediction finalPred=new Prediction(row.getUserID(), targetMovieID, pred.getRating()+p1.getRating()/2.);
-			//
-			predictions.add(finalPred);
+			predictions.add(pred);
 			System.out.println("Aggiunta predizione "+i+": "+pred.toString());
 		}
 		return predictions;
 	}
 
+	/***
+	 * It calculates the average between ratings of input instances 
+	 * @param firstKneighbors
+	 * @return
+	 */
 	private double calculateAverageRating(List<Instance> firstKneighbors) {
 		double tmpAverage=0.;
 		for (Instance i: firstKneighbors){
@@ -70,7 +73,12 @@ public class KnnPredictor implements Predictor{
 		return tmpAverage/firstKneighbors.size();
 	}
 
-	private Neighbors calculateNeighbour(Instance targetInstance) {
+	/***
+	 * It calculates the neighboring instances ot target instance
+	 * @param targetInstance - the instance of which calculating the neighbors
+	 * @return - a object Neighbors that represents all neighboring instances
+	 */
+	private Neighbors calculateNeighbors(Instance targetInstance) {
 		Neighbors neighbors=new Neighbors();
 		Collection<Instance> allInstances=this.id2instance.values();
 		for (Instance i: allInstances){
@@ -79,6 +87,12 @@ public class KnnPredictor implements Predictor{
 		return neighbors;
 	}
 
+	/***
+	 * This method calculate the euclidian distance between two instances
+	 * @param targetInstance - the target instance
+	 * @param i - a generic instance of neighbors of target instance
+	 * @return - double that represents the distance
+	 */
 	private double calculateEuclidianDistance(Instance targetInstance, Instance i) {
 		double distance=0.;
 		double tmp1;
@@ -101,7 +115,11 @@ public class KnnPredictor implements Predictor{
 		return Math.sqrt(distance);	
 	}
 
-	public void loadDataStructuresInMemory() throws PersistenceException{
+	/****
+	 * This method load in memory an HashMap that contains all instances of movies
+	 * @throws PersistenceException
+	 */
+	private void loadDataStructuresInMemory() throws PersistenceException{
 		PerformanceMeter pm=new PerformanceMeter();
 		pm.start();
 		System.out.println("Loading predictor...");
@@ -112,7 +130,14 @@ public class KnnPredictor implements Predictor{
 		pm.stop();
 	}
 
-	public static double roundToFirstPlaceAfterComma(double predictedRating){
+	/****
+	 * This method convert the format of input rating in a target format: 
+	 * - only one place after comma (e.g. 3.4 becomes 3.5, 3.8 becomes 4.0)
+	 * - rating in range [0,5] 
+	 * @param predictedRating - the rating with innappropriate format
+	 * @return - the rating with right format
+	 */
+	private static double roundToFirstPlaceAfterComma(double predictedRating){
 		int decimalPlace=0;
 		double power_of_ten = 1;
 		double fudge_factor = 0.05;
