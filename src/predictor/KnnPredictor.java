@@ -18,7 +18,7 @@ import util.PerformanceMeter;
 
 public class KnnPredictor implements Predictor{
 	private Map<Integer,Instance> id2instance;
-	private final static int K=5;
+	private final static int K=40;
 	
 	public KnnPredictor() throws PersistenceException{
 		this.loadDataStructuresInMemory();

@@ -5,10 +5,7 @@ import java.io.IOException;
 import model.Dataset;
 import parserAndWriter.OutputWriter;
 import persistence.PersistenceException;
-import predictor.AdvancedGenreBasedPredictor;
 import predictor.KnnPredictor;
-import predictor.StupidPredictor;
-import tester.Tester;
 import util.PerformanceMeter;
 
 public class Main {
